@@ -1,10 +1,8 @@
 package com.ruiners.banchat;
 
-import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
@@ -13,20 +11,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.github.nkzawa.emitter.Emitter;
 import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
 import com.google.gson.Gson;
-import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.ruiners.banchat.model.ChatMessage;
 import com.ruiners.banchat.model.ChatViewModel;
 
 import java.net.URISyntaxException;
-import java.util.Objects;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.disposables.Disposables;
 
 public class MainActivity extends AppCompatActivity {
@@ -66,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         EditText editText = findViewById(R.id.edit_text);
         findViewById(R.id.send_button).setOnClickListener(event -> {
             ChatMessage chatMessage = new ChatMessage(editText.getText().toString());
-            socket.emit("message", gson.toJson(chatMessage));
+            socket.emit("chat message", gson.toJson(chatMessage));
         });
 
         chatViewModel.subscribe();
@@ -85,9 +78,9 @@ public class MainActivity extends AppCompatActivity {
     public static Observable<String> createListener(Socket socket) {
         return Observable.create(subscriber -> {
             Emitter.Listener listener = args -> subscriber.onNext((String) args[0]);
-            socket.on("message", listener);
+            socket.on("chat message", listener);
             subscriber.setDisposable(Disposables.fromAction(
-                    () -> socket.off("message", listener)
+                    () -> socket.off("chat message", listener)
             ));
         });
     }
