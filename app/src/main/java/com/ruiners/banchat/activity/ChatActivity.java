@@ -1,7 +1,6 @@
-package com.ruiners.banchat;
+package com.ruiners.banchat.activity;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -9,15 +8,14 @@ import android.widget.ListView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.nkzawa.emitter.Emitter;
-import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.ruiners.banchat.model.Client;
+import com.ruiners.banchat.Config;
+import com.ruiners.banchat.R;
 import com.ruiners.banchat.model.Message;
 import com.ruiners.banchat.model.ChatViewModel;
 
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,10 +24,11 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposables;
 
-public class MainActivity extends AppCompatActivity {
-    private static final String TAG = MainActivity.class.getSimpleName();
+import static com.ruiners.banchat.activity.ChannelsActivity.client;
+import static com.ruiners.banchat.activity.ChannelsActivity.gson;
 
-    private Client client = new Client(0L);
+public class ChatActivity extends AppCompatActivity {
+    private static final String TAG = ChatActivity.class.getSimpleName();
 
     private ChatViewModel chatViewModel;
     private final CompositeDisposable viewSubscriptions = new CompositeDisposable();
@@ -38,9 +37,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        client.setSocket(createSocket());
-        client.getSocket().connect();
 
         Gson gson = new Gson();
 
@@ -58,7 +54,10 @@ public class MainActivity extends AppCompatActivity {
             for (Message message : list)
                 messages.add(message.getMessage());
 
-            runOnUiThread(() -> arrayAdapter.addAll(messages));
+            runOnUiThread(() -> {
+                arrayAdapter.clear();
+                arrayAdapter.addAll(messages);
+            });
             client.getSocket().off("last messages");
         });
 
@@ -85,9 +84,6 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         chatViewModel.unsubscribe();
         viewSubscriptions.clear();
-
-        // Disconnect WebSocket
-        client.getSocket().disconnect();
     }
 
     public static Observable<String> createMessagesListener(Socket socket) {
@@ -99,14 +95,13 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public static Socket createSocket() {
-        Socket socket = null;
-        try {
-            socket = IO.socket(Config.SERVER_URL);
-            socket.on("connect", args -> Log.d(TAG, "Socket connected"));
-        } catch (URISyntaxException e) {
-            Log.e(TAG, "Error creating socket", e);
-        }
-        return socket;
+    @Override
+    public void onBackPressed() {
+        client.setRoom(Config.DEFAULT_ROOM);
+        client.getSocket().emit("enter room", gson.toJson(Config.DEFAULT_ROOM));
+
+        super.onBackPressed();
+        this.finish();
     }
+
 }
