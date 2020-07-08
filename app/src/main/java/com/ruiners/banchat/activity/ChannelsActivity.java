@@ -97,7 +97,7 @@ public class ChannelsActivity extends AppCompatActivity {
 
             assert room != null;
 
-            TextView name = (TextView) convertView.findViewById(R.id.roomName);
+            TextView name = convertView.findViewById(R.id.roomName);
             name.setOnClickListener(event -> {
                 client.setRoom(room.getId());
 
