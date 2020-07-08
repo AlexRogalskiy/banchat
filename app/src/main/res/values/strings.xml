@@ -4,4 +4,6 @@
     <string name="button_text">Send</string>
     <string name="server_ip_message">Input server ip…</string>
     <string name="default_room">Room name</string>
+    <string name="add_room">Add room</string>
+    <string name="default_room_message">Write room name…</string>
 </resources>
