@@ -1,38 +1,35 @@
-package com.ruiners.banchat;
+package com.ruiners.banchat.activity;
 
-import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.nkzawa.emitter.Emitter;
-import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
 import com.google.gson.Gson;
-import com.jakewharton.rxbinding2.widget.RxTextView;
-import com.ruiners.banchat.model.ChatMessage;
+import com.google.gson.reflect.TypeToken;
+import com.ruiners.banchat.Config;
+import com.ruiners.banchat.R;
+import com.ruiners.banchat.model.Message;
 import com.ruiners.banchat.model.ChatViewModel;
 
-import java.net.URISyntaxException;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.disposables.Disposables;
 
-public class MainActivity extends AppCompatActivity {
-    private static final String TAG = MainActivity.class.getSimpleName();
+import static com.ruiners.banchat.activity.ChannelsActivity.client;
+import static com.ruiners.banchat.activity.ChannelsActivity.gson;
 
-    private Socket socket;
+public class ChatActivity extends AppCompatActivity {
+    private static final String TAG = ChatActivity.class.getSimpleName();
+
     private ChatViewModel chatViewModel;
     private final CompositeDisposable viewSubscriptions = new CompositeDisposable();
 
@@ -41,20 +38,28 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        socket = createSocket();
-        socket.on("connect", args -> {
-            //socket.send("{\"username\":\"admin\",\"password\":\"admin\"}");
-            Log.d(TAG, "Socket connected");
-        });
-        socket.connect();
-
         Gson gson = new Gson();
 
-        chatViewModel = new ChatViewModel(createListener(socket));
+        chatViewModel = new ChatViewModel(createMessagesListener(client.getSocket()));
 
         ListView listView = findViewById(R.id.list_view);
         ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
         listView.setAdapter(arrayAdapter);
+
+        client.getSocket().on("last messages", args -> {
+            List<Message> list = gson.fromJson((String) args[0], new TypeToken<List<Message>>(){}.getType());
+            chatViewModel.setLastMessages(list);
+
+            List<String> messages = new ArrayList<>();
+            for (Message message : list)
+                messages.add(message.getMessage());
+
+            runOnUiThread(() -> {
+                arrayAdapter.clear();
+                arrayAdapter.addAll(messages);
+            });
+            client.getSocket().off("last messages");
+        });
 
         viewSubscriptions.add(chatViewModel.getMessageList()
                 .observeOn(AndroidSchedulers.mainThread())
@@ -65,8 +70,10 @@ public class MainActivity extends AppCompatActivity {
 
         EditText editText = findViewById(R.id.edit_text);
         findViewById(R.id.send_button).setOnClickListener(event -> {
-            ChatMessage chatMessage = new ChatMessage(editText.getText().toString());
-            socket.emit("message", gson.toJson(chatMessage));
+            Message chatMessage = new Message(editText.getText().toString(), client.getRoom());
+            client.getSocket().emit("chat message", gson.toJson(chatMessage));
+
+            editText.setText("");
         });
 
         chatViewModel.subscribe();
@@ -77,28 +84,24 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         chatViewModel.unsubscribe();
         viewSubscriptions.clear();
-
-        // Disconnect WebSocket
-        socket.disconnect();
     }
 
-    public static Observable<String> createListener(Socket socket) {
+    public static Observable<String> createMessagesListener(Socket socket) {
         return Observable.create(subscriber -> {
             Emitter.Listener listener = args -> subscriber.onNext((String) args[0]);
-            socket.on("message", listener);
-            subscriber.setDisposable(Disposables.fromAction(
-                    () -> socket.off("message", listener)
-            ));
+            socket.on("chat message", listener);
+
+            subscriber.setDisposable(Disposables.fromAction(() -> socket.off("chat message", listener)));
         });
     }
 
-    public static Socket createSocket() {
-        Socket socket = null;
-        try {
-            socket = IO.socket(Config.SERVER_URL);
-        } catch (URISyntaxException e) {
-            Log.e(TAG, "Error creating socket", e);
-        }
-        return socket;
+    @Override
+    public void onBackPressed() {
+        client.setRoom(Config.DEFAULT_ROOM);
+        client.getSocket().emit("enter room", gson.toJson(Config.DEFAULT_ROOM));
+
+        super.onBackPressed();
+        this.finish();
     }
+
 }
